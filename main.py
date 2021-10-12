@@ -3,7 +3,7 @@ import random
 import reader
 from rmep import split
 from rulegenerator import ruleGenerator
-from pre_processing import pre_process
+from pre_proccessing2 import pre_process
 from classifier import classifierBuilder, isSatisfy
 
 # constants
