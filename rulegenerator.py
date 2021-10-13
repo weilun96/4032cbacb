@@ -1,5 +1,4 @@
-from ruleobjects import RuleItem, FrequentRuleitems, Cars
-
+from ruleobjects import RuleItem, FrequentRuleitems, Cars, CarsWithPruning
 
 def join(item1, item2, dataset):
     if item1.classLabel != item2.classLabel:
@@ -41,7 +40,7 @@ def ruleGenerator(dataset, minsup, minconf):
     frequentRuleitems = FrequentRuleitems()
     classAssociationRules = Cars()
 
-    classification_label = set(
+    classLabel = set(
         [x[-1] for x in dataset]
     )  # this is the types of classification based on last column of dataset
 
@@ -53,7 +52,7 @@ def ruleGenerator(dataset, minsup, minconf):
         )  # distinct value for each column in the dataset
         for value in distinct_value:
             cond_set = {column: value}
-            for classes in classification_label:
+            for classes in classLabel:
                 ruleItem = RuleItem(cond_set, classes, dataset)
                 if ruleItem.support >= minsup:
                     frequentRuleitems.add(ruleItem)
@@ -82,3 +81,9 @@ def ruleGenerator(dataset, minsup, minconf):
         currentCarsNumber = len(cars.rules)
 
     return classAssociationRules
+
+
+def ruleGeneratorWithPruning(dataset, allRules):
+    carsToPrune = CarsWithPruning(allRules)
+    carsToPrune.pruneRules(dataset)
+    return carsToPrune

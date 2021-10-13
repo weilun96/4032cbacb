@@ -1,3 +1,6 @@
+from functools import cmp_to_key
+
+
 class Classifier:
     def __init__(self):
         self.ruleList = list()
@@ -5,11 +8,13 @@ class Classifier:
         self._errorList = list()
         self._defaultClassList = list()
 
-    # insert a rule into rule_list, then choose a default class, and calculate the errors (see line 8, 10 & 11)
+    # add a rule into ruleList, then choose a default class, and calculate the errors
     def insert(self, rule, dataset):
-        self.ruleList.append(rule)  # insert r at the end of C
-        self._selectDefaultClass(dataset)  # select a default class for the current C
-        self._computeError(dataset)  # compute the total number of errors of C
+        self.ruleList.append(rule)  # insert r at the end of classifier
+        self._selectDefaultClass(
+            dataset
+        )  # select a default class for the current classifier
+        self._computeError(dataset)  # compute the total number of errors of classifier
 
     # select the majority class in the remaining data
     def _selectDefaultClass(self, dataset):
@@ -23,12 +28,12 @@ class Classifier:
                 currentDefaultClass = label
         self._defaultClassList.append(currentDefaultClass)
 
-    # compute the sum of errors
+    # compute the total number of errors
     def _computeError(self, dataset):
 
         error_number = 0
 
-        # the number of errors that have been made by all the selected rules in C
+        # the number of errors that have been made by all the selected rules in classifier
         for case in dataset:
             is_cover = False
             for rule in self.ruleList:
@@ -45,14 +50,13 @@ class Classifier:
         )
         self._errorList.append(error_number)
 
-    # see line 14 and 15, to get the final classifier
     def discard(self):
-        # find the first rule p in C with the lowest total number of errors and drop all the rules after p in C
+        # find the first rule p in classifier with the lowest total number of errors and drop all the rules after p in classifier
         index = self._errorList.index(min(self._errorList))
         self.ruleList = self.ruleList[: (index + 1)]
         self._errorList = None
 
-        # assign the default class associated with p to default_class
+        # assign the default class associated with p to defaultClass
         self.defaultClass = self._defaultClassList[index]
         self._defaultClassList = None
 
@@ -74,19 +78,18 @@ def isSatisfy(datacase, rule):
 
 
 # sort the set of generated rules car according to the relation ">", return the sorted rule list
+# 1. the confidence of ri > rj
+# 2. their confidences are the same, but support of ri > rj
+# 3. both confidence & support are the same, ri earlier than rj
 def sort(car):
     def compareMethod(a, b):
-        if a.confidence < b.confidence:  # 1. the confidence of ri > rj
+        if a.confidence < b.confidence:
             return 1
         elif a.confidence == b.confidence:
-            if (
-                a.support < b.support
-            ):  # 2. their confidences are the same, but support of ri > rj
+            if a.support < b.support:
                 return 1
             elif a.support == b.support:
-                if len(a.condSet) < len(
-                    b.condSet
-                ):  # 3. both confidence & support are the same, ri earlier than rj
+                if len(a.condSet) < len(b.condSet):
                     return -1
                 elif len(a.condSet) == len(b.condSet):
                     return 0
@@ -98,35 +101,8 @@ def sort(car):
             return -1
 
     ruleList = list(car.rules)
-    ruleList.sort(key=compareToKey(compareMethod))
+    ruleList.sort(key=cmp_to_key(compareMethod))
     return ruleList
-
-
-def compareToKey(mycmp):
-    class K(object):
-        __slots__ = ["obj"]
-
-        def __init__(self, obj):
-            self.obj = obj
-
-        def __lt__(self, other):
-            return mycmp(self.obj, other.obj) < 0
-
-        def __gt__(self, other):
-            return mycmp(self.obj, other.obj) > 0
-
-        def __eq__(self, other):
-            return mycmp(self.obj, other.obj) == 0
-
-        def __le__(self, other):
-            return mycmp(self.obj, other.obj) <= 0
-
-        def __ge__(self, other):
-            return mycmp(self.obj, other.obj) >= 0
-
-        __hash__ = None
-
-    return K
 
 
 def classifierBuilder(cars, data):

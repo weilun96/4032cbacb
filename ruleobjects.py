@@ -1,3 +1,6 @@
+from classifier import isSatisfy
+
+
 class FrequentRuleitems:
     def __init__(self):
         self.frequentRuleitemsSet = set()
@@ -83,31 +86,118 @@ class Cars:
     def __init__(self):
         self.rules = set()
 
-    # print out all rules
+    # print all the rules in the CARs
     def printRules(self):
-        for item in self.rules:
-            item.printRule()
+        for rules in self.rules:
+            rules.printRule()
 
-    # add a new rule (frequent & accurate), save the ruleitem with the highest confidence when having the same condset
+    # add in a new ruleItem into the CARs if item support and confidence meets requirements
     def _add(self, ruleItem, minsup, minconf):
         if ruleItem.support >= minsup and ruleItem.confidence >= minconf:
             if ruleItem in self.rules:
                 return
             for item in self.rules:
-                if item.condSet == ruleItem.condSet and item.confidence < ruleItem.confidence:
+                if (
+                    item.condSet == ruleItem.condSet
+                    and item.confidence < ruleItem.confidence
+                ):
                     self.rules.remove(item)
                     self.rules.add(ruleItem)
                     return
-                elif item.condSet == ruleItem.condSet and item.confidence >= ruleItem.confidence:
+                elif (
+                    item.condSet == ruleItem.condSet
+                    and item.confidence >= ruleItem.confidence
+                ):
                     return
             self.rules.add(ruleItem)
 
-    # convert frequent ruleitems into car
-    def genRules(self, frequent_ruleitems, minsup, minconf):
-        for item in frequent_ruleitems.frequentRuleitemsSet:
+    # generate rules
+    def genRules(self, frequentRuleitems, minsup, minconf):
+        for item in frequentRuleitems.frequentRuleitemsSet:
             self._add(item, minsup, minconf)
 
-    # union new car into rules list
+    # add rules from new CARs into rules list
     def append(self, car, minsup, minconf):
         for item in car.rules:
             self._add(item, minsup, minconf)
+
+
+class CarsWithPruning(Cars):
+    def __init__(self, cars):
+        Cars.__init__(self)
+        self.rules = cars.rules
+        self.prunedRules = set()
+
+    def printPrunedRules(self):
+        for rules in self.prunedRules:
+            rules.printRule()
+
+    # prune rules
+    def pruneRules(self, dataset):
+        # go through the rules in cars one by one to check if it satisfies the pruning condition
+        for rule in self.rules:
+            prunedRule = prune(rule, dataset)  # pruning method
+            # to check if the pruned rules is repeated
+            is_existed = False
+            for rule in self.prunedRules:
+                if rule.classLabel == prunedRule.classLabel:
+                    if rule.condSet == prunedRule.condSet:
+                        is_existed = True
+                        break
+
+            if not is_existed:
+                self.prunedRules.add(prunedRule)
+
+        self.rules = self.prunedRules
+
+
+# Pruning method
+def prune(rule, dataset):
+    prunedRule = rule
+    minRuleError = 9999999999  # just needs to be a large number, will get updated after 1 iteration of the function
+    pruneRepetition = 0
+    # prune rule recursively - remove attributes that are redundant
+    # pruneRepetition > 10 stop prune --> to prevent infinite recursion
+    def findPruneRule(thisRule):
+        nonlocal prunedRule
+        nonlocal minRuleError
+        nonlocal pruneRepetition
+        
+        # calculate how many errors the rule r make in the dataset
+        def ruleErrors(r):
+            numOfErrors = 0
+            for case in dataset:
+                if isSatisfy(case, r) == False:
+                    numOfErrors += 1
+            return numOfErrors
+
+        numOfErrors = ruleErrors(thisRule)
+        if numOfErrors < minRuleError:
+            minRuleError = numOfErrors
+            prunedRule = thisRule
+
+        condSetThisrule = list(thisRule.condSet)
+        # print(condSetThisrule)
+
+
+
+        if len(condSetThisrule) >= 2:
+            # create a temporary rule without each attribute and check for errors, after each recursion,
+            # remove one attribute of the rule and repeat until the rule has less than 2 attributes
+            for attribute in condSetThisrule:
+                tempCondSet = dict(thisRule.condSet)
+                tempCondSet.pop(attribute)
+                tempRule = RuleItem(tempCondSet, thisRule.classLabel, dataset)
+                tempRuleRrror = ruleErrors(tempRule)
+                if tempRuleRrror <= minRuleError:
+                    minRuleError = tempRuleRrror
+                    prunedRule = tempRule
+                    if len(tempCondSet) >= 3:
+                                # if 
+                        if pruneRepetition >= 10:
+                            return
+                        pruneRepetition += 1
+                        findPruneRule(tempRule)
+
+    findPruneRule(rule)
+    return prunedRule

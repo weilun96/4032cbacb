@@ -1,8 +1,7 @@
-import time
 import random
 import reader
-from rmep import split
-from rulegenerator import ruleGenerator
+from datetime import datetime
+from rulegenerator import ruleGenerator, ruleGeneratorWithPruning
 from pre_proccessing2 import pre_process
 from classifier import classifierBuilder, isSatisfy
 
@@ -10,16 +9,38 @@ from classifier import classifierBuilder, isSatisfy
 minSup = 0.01
 minConf = 0.5
 
-# path to csv file
-csvPath = "datasets/glass.csv"
+## paths to csv file
+# csvPath = "datasets/glass.csv" # class last column = true
 
-# path to data/names
-dataPath = "datasets/abalone.data"
-namesPath = "datasets/abalone.names"
+# csvPath = "datasets/internetfirewall.csv" # class last column = false
+
+# csvPath = "datasets/mushrooms.csv" # class last column = false
+
+## paths to data/names
+# dataPath = "datasets/abalone.data" # class last column = false
+# namesPath = "datasets/abalone.names"
+
+# dataPath = "datasets/car.data" # class last column = true
+# namesPath = "datasets/car.names"
+
+dataPath = "datasets/heart.dat" # class last column = true
+namesPath = "datasets/heart.names"
+
+# dataPath = "datasets/breast-cancer.data" # class last column = false
+# namesPath = "datasets/breast-cancer.names"
+
+# dataPath = "datasets/balance-scale.data"  # class last column = false
+# namesPath = "datasets/balance-scale.names"
+
 
 # classAtLastColumn is to check if the classificaiton label is at last column,
 # if it is at first column, shift everything in first column to last later
-classAtLastColumn = False
+classAtLastColumn = True
+
+
+def formatMicroSeconds(microS):
+    strSeconds = str(microS/1000000) + " seconds"
+    return strSeconds
 
 
 def prepareData():
@@ -54,26 +75,50 @@ def prepareData():
 
 
 def generateRules(data):
-    startTime = time.time()
+    print("Generating rules...")
+    startTime = datetime.now()
     rules = ruleGenerator(data, minSup, minConf)
-    endTime = time.time()
+    endTime = datetime.now()
     timeTaken = endTime - startTime
-    print("Rules:")
-    rules.printRules()
-    print("Time taken to generate rules: %.2lf s" % (timeTaken / 10))
+    print("Rules generated.")
+    formatMicroSeconds(1000)
+    print("Time taken to generate rules:", formatMicroSeconds(timeTaken.microseconds))
     return rules
 
 
-def buildClassifier(rules, data):
-    startTime = time.time()
-    classifier = classifierBuilder(rules, data)
-    endTime = time.time()
+def generateRulesWithPruning(dataset, allCars):
+    print("Pruning rules...")
+    startTime = datetime.now()
+    rulesWithPruning = ruleGeneratorWithPruning(dataset, allCars)
+    endTime = datetime.now()
     timeTaken = endTime - startTime
-    print("Time taken to build classifier: %.2lf s" % (timeTaken / 10))
+    print("Rules pruned.")
+    print("Time taken to prune rules:", formatMicroSeconds(timeTaken.microseconds))
+    return rulesWithPruning
+
+
+def buildClassifier(rules, data, isPrunedData):
+    print("Building classifier...")
+    startTime = datetime.now()
+    classifier = classifierBuilder(rules, data)
+    endTime = datetime.now()
+    timeTaken = endTime - startTime
+    print("Classifier built.")
+    if isPrunedData:
+        print(
+            "Time taken to build classifier WITH pruning:",
+            formatMicroSeconds(timeTaken.microseconds),
+        )
+    else:
+        print(
+            "Time taken to build classifier WITHOUT pruning:",
+            formatMicroSeconds(timeTaken.microseconds),
+        )
     return classifier
 
 
-def getAccuracy(classifier, dataset):
+def getAccuracy(classifier, dataset, isPrunedData):
+    startTime = datetime.now()
     size = len(dataset)
     numberOfErrors = 0
     for case in dataset:
@@ -86,24 +131,52 @@ def getAccuracy(classifier, dataset):
             if classifier.defaultClass != case[-1]:
                 numberOfErrors += 1
     accuracy = 1 - (numberOfErrors / size)
+    endTime = datetime.now()
+    timeTaken = endTime - startTime
+    if isPrunedData:
+        print(
+            "Time taken to calculate accuracy of classifier WITH pruning:",
+            formatMicroSeconds(timeTaken.microseconds),
+        )
+    else:
+        print(
+            "Time taken to calculate accuracy of classifier WITHOUT pruning:",
+            formatMicroSeconds(timeTaken.microseconds),
+        )
     return accuracy
 
 
 def runValidate():
     data = prepareData()
-    # print(data)
     # to split for train and test
     splitPoint = round(0.8 * len(data))
     trainData = data[:splitPoint]
     testData = data[splitPoint:]
 
     rules = generateRules(trainData)
+    rulesWithPruning = generateRulesWithPruning(trainData, rules)
 
-    classifier = buildClassifier(rules, trainData)
+    print("Number of rules WITHOUT pruning:", len(rules.rules))
+    print("Number of rules WITH pruning:", len(rulesWithPruning.rules))
+    print("")
+    classifier = buildClassifier(rulesWithPruning, trainData, False)
 
-    accuracy = getAccuracy(classifier, testData) * 100
-    accuracyString = "Accuracy: " + str(round(accuracy, 2)) + "%"
+    classifierWithPrunedRules = buildClassifier(rulesWithPruning, trainData, True)
+    print("")
+    accuracy = getAccuracy(classifier, testData, False) * 100
+    accuracyString = (
+        "Accuracy of classifier WITHOUT pruning: " + str(round(accuracy, 2)) + "%"
+    )
     print(accuracyString)
+
+    accuracyWithPruning = getAccuracy(classifierWithPrunedRules, testData, True) * 100
+    accuracyStringWithPruning = (
+        "Accuracy of classifier WITH pruning: "
+        + str(round(accuracyWithPruning, 2))
+        + "%"
+    )
+    print(accuracyStringWithPruning)
+    print("")
 
 
 if __name__ == "__main__":
